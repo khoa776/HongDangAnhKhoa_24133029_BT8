@@ -6,8 +6,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class ViewController {
 
-    @GetMapping("/")
-    public String index() {
-        return "index"; // Trả về file index.html trong src/main/resources/templates/
+    // Khi người dùng vào "/" hoặc "/product", trả về file product.html
+    @GetMapping({"/", "/product"})
+    public String productPage() {
+        return "product"; // Đã đổi từ "index" thành "product"
+    }
+
+    // Khi người dùng vào "/category", trả về file category.html
+    @GetMapping("/category")
+    public String categoryPage() {
+        return "category";
     }
 }

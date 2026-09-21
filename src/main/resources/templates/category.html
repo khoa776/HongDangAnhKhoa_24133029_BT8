@@ -1,0 +1,289 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Quản lý Danh mục - GraphQL AJAX</title>
+    <!-- Nhúng jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f8f9fa;
+        color: #333;
+      }
+      h2 {
+        color: #2c3e50;
+        margin-bottom: 15px;
+      }
+
+      .navbar {
+        background: #ffffff;
+        padding: 12px 20px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+      .navbar a {
+        text-decoration: none;
+        font-weight: bold;
+        color: #007bff;
+        margin-right: 15px;
+        padding: 6px 12px;
+        border-radius: 4px;
+      }
+      .navbar a.active,
+      .navbar a:hover {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .container {
+        display: flex;
+        gap: 20px;
+      }
+      .section {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+      .form-section {
+        flex: 1;
+        max-width: 320px;
+      }
+      .list-section {
+        flex: 3;
+      }
+
+      .form-group {
+        margin-bottom: 12px;
+      }
+      label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+        font-size: 14px;
+      }
+      input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #cccccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      button,
+      .btn {
+        padding: 8px 14px;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+        width: 100%;
+      }
+      .btn-primary:hover {
+        background-color: #0056b3;
+      }
+      .btn-warning {
+        background-color: #ffc107;
+        color: #212529;
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      .btn-danger {
+        background-color: #dc3545;
+        color: white;
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+        width: 100%;
+        margin-top: 5px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      th,
+      td {
+        border: 1px solid #e2e8f0;
+        padding: 10px;
+        text-align: left;
+        font-size: 14px;
+      }
+      th {
+        background-color: #f1f5f9;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Menu Điều Hướng -->
+    <div class="navbar">
+      <a href="/product">Quản Lý Sản Phẩm</a>
+      <a href="/category" class="active">Quản Lý Danh Mục</a>
+    </div>
+
+    <h2>Hệ Thống Quản Lý Danh Mục (GraphQL & AJAX)</h2>
+
+    <div class="container">
+      <!-- FORM THÊM / SỬA -->
+      <div class="section form-section">
+        <h3 id="formTitle">Thêm Danh Mục Mới</h3>
+        <input type="hidden" id="categoryId" />
+
+        <div class="form-group">
+          <label>Tên danh mục:</label>
+          <input type="text" id="name" placeholder="Nhập tên danh mục" />
+        </div>
+        <div class="form-group">
+          <label>Tên file ảnh (Images):</label>
+          <input type="text" id="images" placeholder="Ví dụ: laptop.jpg" />
+        </div>
+
+        <button id="btnSave" class="btn-primary" onclick="saveCategory()">
+          Thêm Danh Mục
+        </button>
+        <button
+          id="btnCancel"
+          class="btn-secondary"
+          onclick="resetForm()"
+          style="display: none"
+        >
+          Hủy Sửa
+        </button>
+      </div>
+
+      <!-- DANH SÁCH BẢNG -->
+      <div class="section list-section">
+        <h3>Danh Sách Danh Mục</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tên Danh Mục</th>
+              <th>Hình Ảnh</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="categoryTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      function callGraphQL(query, variables, callback) {
+        $.ajax({
+          url: "/graphql",
+          type: "POST",
+          contentType: "application/json",
+          data: JSON.stringify({ query: query, variables: variables }),
+          success: function (response) {
+            if (callback) callback(response.data);
+          },
+        });
+      }
+
+      function loadCategories() {
+        var query = `query { categories { id name images } }`;
+        callGraphQL(query, {}, function (data) {
+          renderCategoryTable(data.categories);
+        });
+      }
+
+      function saveCategory() {
+        var id = $("#categoryId").val();
+        var name = $("#name").val();
+        var images = $("#images").val();
+
+        if (!name) {
+          alert("Vui lòng nhập Tên danh mục!");
+          return;
+        }
+
+        var input = { name: name, images: images };
+
+        if (id) {
+          var mutation = `mutation updateCat($id: ID!, $input: CategoryInput!) { updateCategory(id: $id, input: $input) { id } }`;
+          callGraphQL(mutation, { id: id, input: input }, function () {
+            alert("Cập nhật thành công!");
+            resetForm();
+            loadCategories();
+          });
+        } else {
+          var mutation = `mutation addCat($input: CategoryInput!) { createCategory(input: $input) { id } }`;
+          callGraphQL(mutation, { input: input }, function () {
+            alert("Thêm danh mục thành công!");
+            resetForm();
+            loadCategories();
+          });
+        }
+      }
+
+      function editCategory(id, name, images) {
+        $("#formTitle").text("Sửa Danh Mục #" + id);
+        $("#categoryId").val(id);
+        $("#name").val(name);
+        $("#images").val(images);
+
+        $("#btnSave").text("Lưu Thay Đổi");
+        $("#btnCancel").show();
+      }
+
+      function resetForm() {
+        $("#formTitle").text("Thêm Danh Mục Mới");
+        $("#categoryId").val("");
+        $("#name").val("");
+        $("#images").val("");
+
+        $("#btnSave").text("Thêm Danh Mục");
+        $("#btnCancel").hide();
+      }
+
+      function deleteCategory(id) {
+        if (!confirm("Bạn có chắc muốn xóa danh mục ID " + id + "?")) return;
+        var mutation = `mutation delCat($id: ID!) { deleteCategory(id: $id) }`;
+        callGraphQL(mutation, { id: id }, function () {
+          loadCategories();
+        });
+      }
+
+      function renderCategoryTable(categories) {
+        var tbody = $("#categoryTableBody").empty();
+        if (!categories || categories.length === 0) {
+          tbody.append(
+            '<tr><td colspan="4" style="text-align:center;">Không có dữ liệu</td></tr>',
+          );
+          return;
+        }
+        $.each(categories, function (i, c) {
+          var img = c.images || "";
+          var row = `<tr>
+                    <td><b>${c.id}</b></td>
+                    <td>${c.name}</td>
+                    <td>${img}</td>
+                    <td>
+                        <button class="btn-warning" onclick="editCategory(${c.id}, '${c.name}', '${img}')">Sửa</button>
+                        <button class="btn-danger" onclick="deleteCategory(${c.id})">Xóa</button>
+                    </td>
+                </tr>`;
+          tbody.append(row);
+        });
+      }
+
+      $(document).ready(function () {
+        loadCategories();
+      });
+    </script>
+  </body>
+</html>
