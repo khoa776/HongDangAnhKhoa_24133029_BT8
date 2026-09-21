@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <title>Quản lý Danh mục - GraphQL AJAX</title>
-    <!-- Nhúng jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
       body {
@@ -121,9 +120,17 @@
         padding: 10px;
         text-align: left;
         font-size: 14px;
+        vertical-align: middle;
       }
       th {
         background-color: #f1f5f9;
+      }
+      .cat-img {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 4px;
+        border: 1px solid #ddd;
       }
     </style>
   </head>
@@ -134,21 +141,23 @@
       <a href="/category" class="active">Quản Lý Danh Mục</a>
     </div>
 
-    <h2>Hệ Thống Quản Lý Danh Mục (GraphQL & AJAX)</h2>
+    <h2>Hệ Thống Quản Lý Danh Mục</h2>
 
     <div class="container">
       <!-- FORM THÊM / SỬA -->
       <div class="section form-section">
         <h3 id="formTitle">Thêm Danh Mục Mới</h3>
         <input type="hidden" id="categoryId" />
+        <input type="hidden" id="oldImages" />
+        <!-- Lưu lại tên ảnh cũ khi sửa -->
 
         <div class="form-group">
           <label>Tên danh mục:</label>
           <input type="text" id="name" placeholder="Nhập tên danh mục" />
         </div>
         <div class="form-group">
-          <label>Tên file ảnh (Images):</label>
-          <input type="text" id="images" placeholder="Ví dụ: laptop.jpg" />
+          <label>Chọn hình ảnh:</label>
+          <input type="file" id="imageFile" accept="image/*" />
         </div>
 
         <button id="btnSave" class="btn-primary" onclick="saveCategory()">
@@ -171,8 +180,8 @@
           <thead>
             <tr>
               <th>ID</th>
-              <th>Tên Danh Mục</th>
               <th>Hình Ảnh</th>
+              <th>Tên Danh Mục</th>
               <th>Hành động</th>
             </tr>
           </thead>
@@ -201,14 +210,36 @@
         });
       }
 
-      function saveCategory() {
+      // Hàm xử lý Upload ảnh qua REST API trước, sau đó lưu vào GraphQL
+      async function saveCategory() {
         var id = $("#categoryId").val();
         var name = $("#name").val();
-        var images = $("#images").val();
+        var fileInput = $("#imageFile")[0].files[0];
+        var images = $("#oldImages").val(); // Mặc định dùng tên ảnh cũ nếu không chọn file mới
 
         if (!name) {
           alert("Vui lòng nhập Tên danh mục!");
           return;
+        }
+
+        // Nếu người dùng chọn file ảnh mới -> Upload lên Server trước
+        if (fileInput) {
+          var formData = new FormData();
+          formData.append("file", fileInput);
+
+          try {
+            var uploadRes = await $.ajax({
+              url: "/api/upload",
+              type: "POST",
+              data: formData,
+              processData: false,
+              contentType: false,
+            });
+            images = uploadRes.fileName; // Lấy tên file vừa lưu
+          } catch (e) {
+            alert("Upload ảnh thất bại!");
+            return;
+          }
         }
 
         var input = { name: name, images: images };
@@ -234,7 +265,8 @@
         $("#formTitle").text("Sửa Danh Mục #" + id);
         $("#categoryId").val(id);
         $("#name").val(name);
-        $("#images").val(images);
+        $("#oldImages").val(images); // Lưu lại tên ảnh cũ
+        $("#imageFile").val(""); // Clear ô chọn file
 
         $("#btnSave").text("Lưu Thay Đổi");
         $("#btnCancel").show();
@@ -244,7 +276,8 @@
         $("#formTitle").text("Thêm Danh Mục Mới");
         $("#categoryId").val("");
         $("#name").val("");
-        $("#images").val("");
+        $("#oldImages").val("");
+        $("#imageFile").val("");
 
         $("#btnSave").text("Thêm Danh Mục");
         $("#btnCancel").hide();
@@ -267,13 +300,18 @@
           return;
         }
         $.each(categories, function (i, c) {
-          var img = c.images || "";
+          var imgName = c.images || "";
+          // Nối đường dẫn /uploads/ để hiển thị ảnh
+          var imgTag = imgName
+            ? `<img src="/uploads/${imgName}" class="cat-img" alt="${c.name}">`
+            : "<i>Không có ảnh</i>";
+
           var row = `<tr>
                     <td><b>${c.id}</b></td>
+                    <td>${imgTag}</td>
                     <td>${c.name}</td>
-                    <td>${img}</td>
                     <td>
-                        <button class="btn-warning" onclick="editCategory(${c.id}, '${c.name}', '${img}')">Sửa</button>
+                        <button class="btn-warning" onclick="editCategory(${c.id}, '${c.name}', '${imgName}')">Sửa</button>
                         <button class="btn-danger" onclick="deleteCategory(${c.id})">Xóa</button>
                     </td>
                 </tr>`;
