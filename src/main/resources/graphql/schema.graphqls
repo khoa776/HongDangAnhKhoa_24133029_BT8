@@ -1,0 +1,67 @@
+type Category {
+  id: ID!
+  name: String!
+  images: String
+  products: [Product]
+}
+
+type User {
+  id: ID!
+  fullname: String!
+  email: String!
+  phone: String
+}
+
+type Product {
+  id: ID!
+  title: String!
+  quantity: Int
+  description: String
+  price: Float!
+  category: Category
+  user: User
+}
+
+# Input để thêm/sửa Product
+input ProductInput {
+  title: String!
+  quantity: Int
+  description: String
+  price: Float!
+  categoryId: ID
+  userId: ID
+}
+
+# Input để thêm/sửa Category
+input CategoryInput {
+  name: String!
+  images: String
+}
+
+# Khai báo các câu lệnh TRUY VẤN (Query)
+type Query {
+  # Hiển thị tất cả product giá từ thấp đến cao
+  productsByPriceAsc: [Product]
+
+  # Lấy tất cả product của 01 category
+  productsByCategoryId(categoryId: ID!): [Product]
+
+  # Query lấy danh sách / chi tiết
+  categories: [Category]
+  categoryById(id: ID!): Category
+  products: [Product]
+  productById(id: ID!): Product
+}
+
+# Khai báo các câu lệnh THAY ĐỔI DỮ LIỆU (Mutation)[cite: 1]
+type Mutation {
+  # CRUD Product
+  createProduct(input: ProductInput!): Product
+  updateProduct(id: ID!, input: ProductInput!): Product
+  deleteProduct(id: ID!): Boolean
+
+  # CRUD Category
+  createCategory(input: CategoryInput!): Category
+  updateCategory(id: ID!, input: CategoryInput!): Category
+  deleteCategory(id: ID!): Boolean
+}

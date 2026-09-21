@@ -1,0 +1,260 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Quản lý Sản phẩm & Danh mục (GraphQL)</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        line-height: 1.6;
+      }
+      .container {
+        display: flex;
+        gap: 20px;
+      }
+      .section {
+        flex: 1;
+        border: 1px solid #ccc;
+        padding: 15px;
+        border-radius: 8px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f4f4f4;
+      }
+      .form-group {
+        margin-bottom: 10px;
+      }
+      label {
+        display: block;
+        font-weight: bold;
+      }
+      input,
+      select,
+      button {
+        padding: 8px;
+        margin-top: 4px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .btn-danger {
+        background-color: #dc3545;
+        width: auto;
+        padding: 5px 10px;
+      }
+      .btn-danger:hover {
+        background-color: #a71d2a;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Hệ Thống Quản Lý Sản Phẩm bằng GraphQL & AJAX</h2>
+
+    <div class="container">
+      <!-- FORM THÊM SẢN PHẨM -->
+      <div class="section">
+        <h3>Thêm Sản Phẩm Mới</h3>
+        <div class="form-group">
+          <label>Tên sản phẩm:</label>
+          <input type="text" id="title" placeholder="Nhập tên sản phẩm" />
+        </div>
+        <div class="form-group">
+          <label>Giá:</label>
+          <input type="number" id="price" placeholder="Nhập giá" />
+        </div>
+        <div class="form-group">
+          <label>Số lượng:</label>
+          <input type="number" id="quantity" placeholder="Nhập số lượng" />
+        </div>
+        <div class="form-group">
+          <label>Mô tả:</label>
+          <input type="text" id="description" placeholder="Mô tả" />
+        </div>
+        <div class="form-group">
+          <label>Danh mục (Category ID):</label>
+          <input type="number" id="categoryId" value="1" />
+        </div>
+        <button onclick="createProduct()">Thêm Sản Phẩm</button>
+      </div>
+
+      <!-- DANH SÁCH SẢN PHẨM -->
+      <div class="section" style="flex: 2">
+        <h3>Danh Sách Sản Phẩm</h3>
+
+        <label for="filterCategory">Lọc theo Category ID:</label>
+        <div style="display: flex; gap: 10px">
+          <input
+            type="number"
+            id="filterCategoryId"
+            placeholder="Nhập ID Category để lọc"
+          />
+          <button onclick="loadProductsByCategory()" style="width: 200px">
+            Lọc
+          </button>
+          <button
+            onclick="loadProductsByPriceAsc()"
+            style="width: 250px; background-color: #28a745"
+          >
+            Xếp Giá Thấp -> Cao
+          </button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tên Sản Phẩm</th>
+              <th>Giá</th>
+              <th>Số lượng</th>
+              <th>Danh mục</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="productTableBody">
+            <!-- Dữ liệu render bằng AJAX -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      // Hàm dùng chung gửi AJAX GraphQL Request
+      async function fetchGraphQL(query, variables = {}) {
+        const response = await fetch("/graphql", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ query, variables }),
+        });
+        return await response.json();
+      }
+
+      // 1. Hiển thị tất cả product xếp theo giá từ thấp đến cao
+      async function loadProductsByPriceAsc() {
+        const query = `
+                query {
+                    productsByPriceAsc {
+                        id
+                        title
+                        price
+                        quantity
+                        category { name }
+                    }
+                }`;
+        const result = await fetchGraphQL(query);
+        renderTable(result.data.productsByPriceAsc);
+      }
+
+      // 2. Lấy tất cả product của 01 category
+      async function loadProductsByCategory() {
+        const categoryId = document.getElementById("filterCategoryId").value;
+        if (!categoryId) {
+          alert("Vui lòng nhập Category ID!");
+          return;
+        }
+        const query = `
+                query getByCat($catId: ID!) {
+                    productsByCategoryId(categoryId: $catId) {
+                        id
+                        title
+                        price
+                        quantity
+                        category { name }
+                    }
+                }`;
+        const result = await fetchGraphQL(query, { catId: categoryId });
+        renderTable(result.data.productsByCategoryId);
+      }
+
+      // 3. Mutation: Tạo sản phẩm mới
+      async function createProduct() {
+        const title = document.getElementById("title").value;
+        const price = parseFloat(document.getElementById("price").value);
+        const quantity = parseInt(document.getElementById("quantity").value);
+        const description = document.getElementById("description").value;
+        const categoryId = document.getElementById("categoryId").value;
+
+        const mutation = `
+                mutation addPro($input: ProductInput!) {
+                    createProduct(input: $input) {
+                        id
+                        title
+                    }
+                }`;
+
+        const variables = {
+          input: { title, price, quantity, description, categoryId },
+        };
+
+        await fetchGraphQL(mutation, variables);
+        alert("Thêm sản phẩm thành công!");
+        loadProductsByPriceAsc();
+      }
+
+      // Mutation: Xóa sản phẩm
+      async function deleteProduct(id) {
+        if (!confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) return;
+
+        const mutation = `
+                mutation delPro($id: ID!) {
+                    deleteProduct(id: $id)
+                }`;
+
+        await fetchGraphQL(mutation, { id });
+        loadProductsByPriceAsc();
+      }
+
+      // Hàm render dữ liệu ra bảng HTML
+      function renderTable(products) {
+        const tbody = document.getElementById("productTableBody");
+        tbody.innerHTML = "";
+        if (!products || products.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="6" style="text-align:center;">Không có dữ liệu</td></tr>';
+          return;
+        }
+        products.forEach((p) => {
+          const categoryName = p.category ? p.category.name : "N/A";
+          tbody.innerHTML += `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td>${p.title}</td>
+                        <td>${p.price.toLocaleString()} VNĐ</td>
+                        <td>${p.quantity}</td>
+                        <td>${categoryName}</td>
+                        <td>
+                            <button class="btn-danger" onclick="deleteProduct(${p.id})">Xóa</button>
+                        </td>
+                    </tr>
+                `;
+        });
+      }
+
+      // Tự động tải danh sách khi vào trang
+      window.onload = loadProductsByPriceAsc;
+    </script>
+  </body>
+</html>
